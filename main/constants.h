@@ -21,7 +21,8 @@
 // #    TIMER NAMES
 // #
 #define TMRNAME_SDS011_TIMEOUT "sds011_timeout_tmr"
-#define TMRNAME_MEASURE_TIMEOUT "measure_tmr"
+#define TMRNAME_MEASURE_TIMEOUT "mestout_tmr"
+#define TMRNAME_MEASURE_START "messtart_tmr"
 #define TMRNAME_PM_WORKING "pm_working_tmr"
 #define TMRNAME_RAIN_DEBOUNCE "rain_deb_tmr"
 #define TMRNAME_RAIN_MEASURE "rain_meas_tmr"
@@ -29,12 +30,13 @@
 // #######################
 // #    TIMER IDS
 // #
-#define TMR_ID(id) (void*)id
+#define TMR_ID(id) ((void*)(id))
 #define TMRID_SDS011_TIMEOUT TMR_ID(0)
 #define TMRID_MEASURE_TIMEOUT TMR_ID(1)
-#define TMRID_PM_WORKING TMR_ID(2)
-#define TMRID_RAIN_DEBOUNCE TMR_ID(3)
-#define TMRID_RAIN_MEASURE TMR_ID(4)
+#define TMRID_MEASURE_START TMR_ID(2)
+#define TMRID_PM_WORKING TMR_ID(3)
+#define TMRID_RAIN_DEBOUNCE TMR_ID(4)
+#define TMRID_RAIN_MEASURE TMR_ID(5)
 
 // #######################
 // #    MISC

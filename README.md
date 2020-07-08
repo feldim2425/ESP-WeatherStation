@@ -11,9 +11,9 @@ The project is not Ardunino based. It is made using the [ESP-IDF SDK](https://gi
  * BME280
  * Tipping bucket rain gague
 
-## Measurments
+## Measurements
 
-The weatherstation starts a new measurment every 30 seconds. Every 10 measurments the SDS011 is activated for new PM readings. Since the SDS takes some time to get accurate results it runs for 30 seconds. Which also delays the measurment.
+The weatherstation starts a new measurment every 60 seconds. Every 10 measurments the SDS011 is activated for new PM readings. Since the SDS takes some time to get accurate results it runs for 30 seconds. Which also delays the measurment.
 
 The data is pushed to a MQTT Broker (IP, Authentication and Topic set in the config) in a JSON format:
 ```

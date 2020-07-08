@@ -57,7 +57,6 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         xEventGroupSetBits(wifi_event_group, IP4_CONNECTED_BIT);
         ESP_LOGI(TAG, "got ip: %s",ip4addr_ntoa(&event->event_info.got_ip.ip_info.ip));
         ESP_ERROR_CHECK(init_publish());
-        station_connected(true);
         break;
     case SYSTEM_EVENT_AP_STA_GOT_IP6:
         xEventGroupSetBits(wifi_event_group, IP6_CONNECTED_BIT);

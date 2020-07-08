@@ -5,7 +5,8 @@ static sds011_instance_t sensInstance;
 static bme280_instance_t bmeInstance;
 
 static TimerHandle_t sds_timout_tmr;
-static TimerHandle_t measurement_tmr;
+static TimerHandle_t measurement_start_tmr;
+static TimerHandle_t measurement_timeout_tmr;
 static TimerHandle_t pm_work_tmr;
 static TimerHandle_t rain_period_tmr;
 static TimerHandle_t rain_debounce_tmr;
@@ -129,10 +130,6 @@ static void prvEndMeasurement(){
     xTimerStop(pm_work_tmr, 0);
     ESP_LOGI(TAG, "[MEASURE] Stop");
     weather_data.data_bits = 0;
-    xTimerChangePeriod(measurement_tmr, STATION_CONFIG_PERIOD, 0);
-    if((measurement_state & STATION_STATE_READY) != 0){
-        xTimerStart(measurement_tmr, 0);
-    }
 }
 
 /*
@@ -149,23 +146,19 @@ static void station_updateReady(){
     }
 
     // Changed to ready therefore the state gets set
-    // If the measurment is not running the weather_data gets reset, the timer period is updated and the timer gets started
+    // If the measurment is not running the weather_data gets reset and the timer gets started
     if(ready){
         measurement_state |= STATION_STATE_READY;
         if((measurement_state & STATION_STATE_RUNNING) == 0){
             weather_data.data_bits = 0;
-            xTimerChangePeriod(measurement_tmr, STATION_CONFIG_PERIOD, 0);
-            xTimerStart(measurement_tmr, 0);
         }
+        xTimerStart(measurement_start_tmr, 0);
     }
     // Changed to ready therefore the state gets set
     // If the measurment is not running the timer gets stoped
-    // The running check is required because stopping it during a measurment stops the timeout and not the measurment
     else {
         measurement_state &= ~STATION_STATE_READY;
-        if((measurement_state & STATION_STATE_RUNNING) == 0){
-            xTimerStop(measurement_tmr, 0);
-        }
+        xTimerStop(measurement_start_tmr, 0);
     }
 }
 
@@ -175,28 +168,21 @@ static void station_updateReady(){
 static void measure_task(void *arg)
 {
     EventBits_t bits;
+    float rain_amount;
 
     ESP_ERROR_CHECK(sds011_setReport(&sensInstance, SDS011_REPORTMODE_QUERY));
     ESP_ERROR_CHECK(sds011_setSleep(&sensInstance, SDS011_SLEEPMODE_SLEEP));
 
     while(true){
         bits = xEventGroupWaitBits (measurement_group,
-                                    STATION_EVENT_TIMER | STATION_EVENT_DAT_PM | STATION_EVENT_DAT_PTH,
-                                    STATION_EVENT_TIMER | STATION_EVENT_DAT_PM | STATION_EVENT_DAT_PTH,
+                                    STATION_EVENT_TSTART | STATION_EVENT_TTOUT | STATION_EVENT_DAT_PM | STATION_EVENT_DAT_PTH,
+                                    STATION_EVENT_TSTART | STATION_EVENT_TTOUT | STATION_EVENT_DAT_PM | STATION_EVENT_DAT_PTH,
                                     false, portMAX_DELAY);
            
         // Station Timer is used to start and timeout a measurment
-        if(bits & STATION_EVENT_TIMER){
-            // The measurement is running therefore the timer is interpreted as a timeout
-            if(measurement_state & STATION_STATE_RUNNING) {
-                ESP_LOGI(TAG, "[MEASURE] Timeout with data: 0x%X", weather_data.data_bits);
-                if(weather_data.data_bits != 0){
-                    push_weather_data(weather_data);
-                }
-                prvEndMeasurement();
-            }
+        if((bits & STATION_EVENT_TSTART) && !(measurement_state & STATION_STATE_RUNNING)){
             // Measurement is not running. New measurment gets scheduled if the station is ready
-            else if((measurement_state & STATION_STATE_READY) != 0 ) {
+            if(measurement_state & STATION_STATE_READY) {
                 measurement_state |= STATION_STATE_RUNNING;
 
                 // Increment the PM Countdown and schedule a PM measurement if the countdown reaches 0 
@@ -220,10 +206,8 @@ static void measure_task(void *arg)
                     xTimerStart(pm_work_tmr, 0);
                 }
 
-                // Modify the period of the measurment timer for the timeout and restart the timer
-                // Info: The period is modified again in prvEndMeasurement for the next measurement 
-                xTimerChangePeriod(measurement_tmr, STATION_CONFIG_TIMEOUT, 0);
-                xTimerStart(measurement_tmr, 0);
+                // Start the timer for the timeout
+                xTimerStart(measurement_timeout_tmr, 0);
                 
                 // In case the rain gague collected some data the data gets updated immediatly
                 // Depending on the settings this will always be the case or only at the beginning (first measurment) but it should never change back
@@ -233,11 +217,18 @@ static void measure_task(void *arg)
                     ESP_LOGI(TAG, "Rain amount: %d", (uint16_t)(weather_data.rain * 10));
                 }
             }
-            // This else should never execute. If would be if the measurment timer is running but the ready state is reset and the station is not measuring
+            // This else should never execute. It would if the measurment start timer is running but the ready state is reset and the station is not measuring
             // Since the state is only handled by station_updateReady which also starts and stops the timer if necessary this should not happen.
             else {
                 ESP_LOGI(TAG, "[MEASURE] Start canceled (Not Ready) / State: 0x%X",measurement_state);
             }
+        }
+        else if((bits & STATION_EVENT_TTOUT) && (measurement_state & STATION_STATE_RUNNING)) {
+                ESP_LOGI(TAG, "[MEASURE] Timeout with data: 0x%X", weather_data.data_bits);
+                if(weather_data.data_bits != 0){
+                    push_weather_data(weather_data);
+                }
+                prvEndMeasurement();
         }
         // Timeout not reached (STATION_EVENT_TIMER not set and measure_state is Running) but there is new data
         else if((bits & (STATION_EVENT_DAT_PM | STATION_EVENT_DAT_PTH)) && (measurement_state & STATION_STATE_RUNNING)){
@@ -267,12 +258,21 @@ static void pmWork_callback(TimerHandle_t xTimer){
 }
 
 /*
- * This Timer callback is used to start a measurment and also to force a stop if one of the sensors isn't responding
+ * This Timer callback is used to force a stop if one of the sensors isn't responding
+ * Managing is done in the measure_task
+ */
+static void measure_timeout_callback(TimerHandle_t xTimer)
+{
+    xEventGroupSetBits(measurement_group, STATION_EVENT_TTOUT);
+}
+
+/*
+ * This Timer callback is used to start a measurment
  * Managing is done in the measure_task and station_updateReady
  */
-static void measure_callback(TimerHandle_t xTimer)
+static void measure_start_callback(TimerHandle_t xTimer)
 {
-    xEventGroupSetBits(measurement_group, STATION_EVENT_TIMER);
+    xEventGroupSetBits(measurement_group, STATION_EVENT_TSTART);
 }
 
 /*
@@ -433,8 +433,9 @@ static void init_rgague(){
 static void init_station_tasks()
 {
     sds_timout_tmr = xTimerCreate(TMRNAME_SDS011_TIMEOUT, pdMS_TO_TICKS(1000), false, TMRID_SDS011_TIMEOUT, sds011_timeout_callback);
-    measurement_tmr = xTimerCreate(TMRNAME_MEASURE_TIMEOUT, STATION_CONFIG_PERIOD, false, TMRID_MEASURE_TIMEOUT, measure_callback);
-    pm_work_tmr = xTimerCreate(TMRNAME_PM_WORKING, pdMS_TO_TICKS(30000), false, TMRID_PM_WORKING, pmWork_callback);
+    measurement_start_tmr = xTimerCreate(TMRNAME_MEASURE_START, STATION_CONFIG_PERIOD, true, TMRID_MEASURE_START, measure_start_callback);
+    measurement_timeout_tmr = xTimerCreate(TMRNAME_MEASURE_TIMEOUT, STATION_CONFIG_TIMEOUT, false, TMRID_MEASURE_TIMEOUT, measure_timeout_callback);
+    pm_work_tmr = xTimerCreate(TMRNAME_PM_WORKING, STATION_CONFIG_PMWORK, false, TMRID_PM_WORKING, pmWork_callback);
     rain_debounce_tmr = xTimerCreate(TMRNAME_RAIN_DEBOUNCE, pdMS_TO_TICKS(CONFIG_RGAGUE_DEBOUNCE), false, TMRID_RAIN_DEBOUNCE, rain_debounce_callback);
     rain_period_tmr = xTimerCreate(TMRNAME_RAIN_MEASURE, pdMS_TO_TICKS(CONFIG_RGAGUE_PERIOD * 1000), true, TMRID_RAIN_MEASURE, rain_period_callback);
     

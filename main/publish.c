@@ -15,6 +15,9 @@ static esp_err_t mqtt_event_handler(esp_mqtt_event_handle_t event)
             ESP_LOGW(TAG, "MQTT error");
             station_connected(false);
             break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(TAG, "MQTT disconnected");
+            station_connected(false);
         default:
             break;
     }
