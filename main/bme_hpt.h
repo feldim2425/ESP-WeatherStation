@@ -197,7 +197,7 @@ uint8_t bme280_checkStatus(bme280_instance_t* inst);
 
 esp_err_t bme280_readCalibration(bme280_instance_t* inst);
 
-uint32_t bme280_getPreasure(bme280_instance_t* inst, uint8_t updateTemperature);
+uint32_t bme280_getPressure(bme280_instance_t* inst, uint8_t updateTemperature);
 
 int32_t bme280_getTemperature(bme280_instance_t* inst);
 
