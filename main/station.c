@@ -212,7 +212,13 @@ static void measure_task(void *arg)
                 // In case the rain gague collected some data the data gets updated immediatly
                 // Depending on the settings this will always be the case or only at the beginning (first measurment) but it should never change back
                 if(measurement_state & STATION_STATE_RAINMEASURED){
-                    weather_data.rain = (float)rain_last / (((float)CONFIG_RGAGUE_CALIB_OPENING / 100000.0) * (float)CONFIG_RGAGUE_CALIB_COUNTS);
+                    /*
+                     * <rain amount in l> = ( <counts> / (<count per 100ml> * 10 ))
+                     * <rain in l per m^2> = <rain amount in l> / (<opening in mm^2> / (1000 * 1000))
+                     * Rain is measured in liters per mm^2 per measure period
+                     */
+                    rain_amount = (float)rain_last / ((float)CONFIG_RGAGUE_CALIB_COUNTS * 10.0);
+                    weather_data.rain = rain_amount / ((float)CONFIG_RGAGUE_CALIB_OPENING / 1000000.0);
                     weather_data.data_bits |= WEATHER_BIT_RAIN;
                     ESP_LOGI(TAG, "Rain amount: %d", (uint16_t)(weather_data.rain * 10));
                 }
