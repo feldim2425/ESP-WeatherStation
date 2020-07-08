@@ -1,0 +1,189 @@
+menu "Project (Weather) Configuration"
+    menu "Network"
+
+        config ESP_WIFI_SSID
+            string "WiFi SSID"
+            default "myssid"
+            help
+                SSID (network name) to connect to.
+
+        config ESP_WIFI_PASSWORD
+            string "WiFi Password"
+            default "mypassword"
+            help
+                WiFi password (WPA or WPA2) for the example to use.
+
+        config ESP_HOSTNAME
+            string "Hostname"
+            default "WeatherStationESP"
+            help
+                Hostname for the ESP
+
+    endmenu
+
+    menu "MQTT"
+
+        config MQTT_BROKER_URI
+            string "Broker URI"
+            default "mqtt://example.com:1883"
+            help
+                "Sets the URI for the MQTT Broker"
+
+        config MQTT_TOPIC
+            string "Topic"
+            default "weather"
+            help
+                "Sets the Topic where the infomation should be published"
+
+        config MQTT_USERAUTHENTICATED
+            bool "Use User Authentication"
+            default n
+            help
+                "Enable if your broker has a user authentication"
+        
+        config MQTT_AUTH_USERNAME
+            depends on MQTT_USERAUTHENTICATED
+            string "Username"
+            default "user"
+            help
+                "Set the Username for the MQTT authentication"
+
+        config MQTT_AUTH_PASSWORD
+            depends on MQTT_USERAUTHENTICATED
+            string "Password"
+            default "password"
+            help
+                "Set the Password for the MQTT authentication"
+
+    endmenu
+
+    menu "Hardware"
+
+        config CONNECTION_STATUS_LED
+            int "Connection Status LED Pin"
+            default 16
+            help
+                "Pin for the Connection Status LED"
+
+        config CONNECTION_STATUS_LED_INVERT
+            bool "Connection Status LED Invert"
+            default y
+            help
+                "Will invert the status led. Usefull for a low-active circuit"
+        
+        menu "I2C Bus Config"
+            config I2C_SCL
+                int "I2C SCL Pin"
+                default 18
+                help
+                    "Digital Pin for the I2C SCL Line"
+
+            config I2C_SDA
+                int "I2C SDA Pin"
+                default 19
+                help
+                    "Digital Pin for the I2C SDA Line"
+
+            config I2C_PULLUPS
+                bool "I2C Pull-Up"
+                default y
+                help
+                    "Set the internal pullup for the SCL and SDA Line"
+
+            config I2C_CLOCK
+                int "I2C Bus Master Clock"
+                default 100000
+                help
+                    "I2C Bus Master clock rate in Hz"
+
+        endmenu
+
+        menu "SDS011 UART Config"
+            config SDS011_UART
+                int "SDS11 UART Number"
+                default 1
+                help
+                    "Number for the SDS011 UART interface"
+
+            config SDS011_CHANGE_PINS
+                bool "Change RX and TX pins for the UART interface"
+                default y
+                help
+                    "Enable if your broker has a user authentication"
+
+            config SDS011_RX
+                depends on SDS011_CHANGE_PINS
+                int "SDS11 RX Pin"
+                default 16
+                help
+                    "Digital Pin for the UART RX Pin (connected to TX on the Sensor)"
+
+            config SDS011_TX
+                depends on SDS011_CHANGE_PINS
+                int "SDS11 TX Pin"
+                default 17
+                help
+                    "Digital Pin for the UART TX Pin (connected to RX on the Sensor)"
+        endmenu
+
+        menu "Rain Gague Config"
+            config RGAGUE_PIN
+                int "Rain gague input"
+                default 3
+                help
+                    "Input pin for the rain gague"
+            
+            choice RGAGUE_PINMODE
+                prompt "Select rain gague input pin resistor mode"
+                default RGAGUE_PINMODE_PULL_UP
+
+                config RGAGUE_PINMODE_PULL_UP
+                    bool "Pull UP"
+                
+                config RGAGUE_PINMODE_PULL_DOWN
+                    bool "Pull DOWN"
+
+                config RGAGUE_PINMODE_NONE
+                    bool "Floating / Tristate"  
+            endchoice
+            
+            choice RGAGUE_EDGECOUNT
+                prompt "Select rain gague trigger edge"
+                default RGAGUE_EDGECOUNT_FALLING
+
+                config RGAGUE_EDGECOUNT_RISING
+                    bool "Count RISING edge"
+                
+                config RGAGUE_EDGECOUNT_FALLING
+                    bool "Count FALLING edge"
+
+                config RGAGUE_EDGECOUNT_BOTH
+                    bool "Count ALL edges"
+            endchoice
+            
+            config RGAGUE_DEBOUNCE
+                int "Debounce time [ms]"
+                default 100
+                help
+                    "Time to wait until a new trigger can occure. Helps to debounce the contact"
+                    
+            config RGAGUE_PERIOD
+                int "Measurement time [s]"
+                default 60
+                help
+                    "Number of seconds one measurment cycle lasts. After a measurment cycle the measured count is used to calculate the mm of rain and the counter starts again at 0."
+
+            config RGAGUE_CALIB_COUNTS
+                int "Counts per 100ml water"
+                default 50
+                help
+                    "Calibration value. Number of counts per 100ml water."
+
+            config RGAGUE_CALIB_OPENING
+                int "Opening area in [mm^2]"
+                default 10000
+                help
+                    "Calibration value. Size of the hopper area."
+        endmenu
+    endmenu
+endmenu
