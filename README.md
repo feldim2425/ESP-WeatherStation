@@ -11,6 +11,22 @@ The project is not Ardunino based. It is made using the [ESP-IDF SDK](https://gi
  * BME280
  * Tipping bucket rain gague
 
+## Measurments
+
+The weatherstation starts a new measurment every 30 seconds. Every 10 measurments the SDS011 is activated for new PM readings. Since the SDS takes some time to get accurate results it runs for 30 seconds. Which also delays the measurment.
+
+The data is pushed to a MQTT Broker (IP, Authentication and Topic set in the config) in a JSON format:
+```json
+{
+	"humid": <humidity in %>, 
+	"pressure": <pressure in hPa>, 
+	"temp": <temperature in °C>, 
+	"pm10": <pm10 value in µg/m³>, 
+	"pm25": <pm2.5 value in µg/m³>, 
+	"rain": <rain amount in ml/m²>
+}
+```
+
 ## Build the project
 
 1. Download and install the [ESP-IDF SDK](https://github.com/espressif/esp-idf) you can find more information in the README of the SDK or [here](https://docs.espressif.com/projects/esp-idf/en/stable/get-started/#step-1-install-prerequisites)
